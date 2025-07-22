@@ -1,5 +1,6 @@
 const WebhookManager = require('./WebhookManager');
 const StripeAPI = require('./StripeAPI');
+const StripeSecondaryAPI = require('./StripeSecondaryAPI');
 const StripeMigrations = require('./StripeMigrations');
 const WebhookController = require('./WebhookController');
 const DomainEvents = require('@tryghost/domain-events');
@@ -53,6 +54,7 @@ module.exports = class StripeService {
         models
     }) {
         const api = new StripeAPI({labs});
+        const secondaryApi = new StripeSecondaryAPI({labs});
         const migrations = new StripeMigrations({
             models,
             api
@@ -61,6 +63,11 @@ module.exports = class StripeService {
         const webhookManager = new WebhookManager({
             StripeWebhook,
             api
+        });
+
+        const secondaryWebhookManager = new WebhookManager({
+            StripeWebhook,
+            api: secondaryApi
         });
 
         const subscriptionEventService = new SubscriptionEventService({
@@ -118,11 +125,21 @@ module.exports = class StripeService {
             checkoutSessionEventService
         });
 
+        const secondaryWebhookController = new WebhookController({
+            webhookManager: secondaryWebhookManager,
+            subscriptionEventService,
+            invoiceEventService,
+            checkoutSessionEventService
+        });
+
         this.models = models;
         this.api = api;
+        this.secondaryApi = secondaryApi;
         this.webhookManager = webhookManager;
+        this.secondaryWebhookManager = secondaryWebhookManager;
         this.migrations = migrations;
         this.webhookController = webhookController;
+        this.secondaryWebhookController = secondaryWebhookController;
     }
 
     async connect() {
@@ -141,8 +158,10 @@ module.exports = class StripeService {
             stripe_coupon_id: null
         });
         await this.webhookManager.stop();
+        await this.secondaryWebhookManager.stop();
 
         this.api.configure(null);
+        this.secondaryApi.configure(null);
 
         DomainEvents.dispatch(StripeLiveDisabledEvent.create({message: 'Stripe Live Mode Disabled'}));
     }
@@ -171,5 +190,36 @@ module.exports = class StripeService {
             webhookHandlerUrl: config.webhookHandlerUrl
         });
         await this.webhookManager.start();
+    }
+
+    /**
+     * Configures the Secondary Stripe API and registers the webhook with Stripe
+     * @param {IStripeServiceConfig} config
+     */
+    async configureSecondary(config) {
+        if (!config) {
+            this.secondaryApi.configure(null);
+            return;
+        }
+
+        this.secondaryApi.configure({
+            secretKey: config.secretKey,
+            publicKey: config.publicKey,
+            enablePromoCodes: config.enablePromoCodes,
+            get enableAutomaticTax() {
+                return config.enableAutomaticTax;
+            },
+            checkoutSessionSuccessUrl: config.checkoutSessionSuccessUrl,
+            checkoutSessionCancelUrl: config.checkoutSessionCancelUrl,
+            checkoutSetupSessionSuccessUrl: config.checkoutSetupSessionSuccessUrl,
+            checkoutSetupSessionCancelUrl: config.checkoutSetupSessionCancelUrl,
+            testEnv: config.testEnv
+        });
+
+        await this.secondaryWebhookManager.configure({
+            webhookSecret: config.webhookSecret,
+            webhookHandlerUrl: config.webhookHandlerUrl
+        });
+        await this.secondaryWebhookManager.start();
     }
 };

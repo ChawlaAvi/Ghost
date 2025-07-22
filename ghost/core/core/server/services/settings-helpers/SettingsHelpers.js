@@ -54,6 +54,28 @@ class SettingsHelpers {
     }
 
     /**
+     * @param {'direct' | 'connect'} type - The "type" of keys to fetch from settings
+     * @returns {{publicKey: string, secretKey: string} | null}
+     */
+    getSecondaryStripeKeys(type) {
+        if (type !== 'direct' && type !== 'connect') {
+            throw new errors.IncorrectUsageError({message: tpl(messages.incorrectKeyType)});
+        }
+
+        const secretKey = this.settingsCache.get(`stripe_secondary_${type === 'connect' ? 'connect_' : ''}secret_key`);
+        const publicKey = this.settingsCache.get(`stripe_secondary_${type === 'connect' ? 'connect_' : ''}publishable_key`);
+
+        if (!secretKey || !publicKey) {
+            return null;
+        }
+
+        return {
+            secretKey,
+            publicKey
+        };
+    }
+
+    /**
      * @returns {{publicKey: string, secretKey: string} | null}
      */
     getActiveStripeKeys() {
@@ -72,8 +94,31 @@ class SettingsHelpers {
         return connectKeys;
     }
 
+    /**
+     * @returns {{publicKey: string, secretKey: string} | null}
+     */
+    getActiveSecondaryStripeKeys() {
+        const stripeDirect = this.config.get('stripeDirect');
+
+        if (stripeDirect) {
+            return this.getSecondaryStripeKeys('direct');
+        }
+
+        const connectKeys = this.getSecondaryStripeKeys('connect');
+
+        if (!connectKeys) {
+            return this.getSecondaryStripeKeys('direct');
+        }
+
+        return connectKeys;
+    }
+
     isStripeConnected() {
         return this.getActiveStripeKeys() !== null;
+    }
+
+    isSecondaryStripeConnected() {
+        return this.getActiveSecondaryStripeKeys() !== null;
     }
 
     arePaidMembersEnabled() {
