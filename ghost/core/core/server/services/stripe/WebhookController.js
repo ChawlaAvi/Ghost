@@ -58,6 +58,41 @@ module.exports = class WebhookController {
     }
 
     /**
+     * Handles a Stripe webhook event from the secondary account.
+     * - Parses the webhook event using secondary webhook secret
+     * - Delegates the event to the appropriate handler
+     * - Returns a 200 response to Stripe to confirm receipt of the event, or an error response if the event is not handled or if an error occurs
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @returns {Promise<void>}
+     */
+    async handleSecondary(req, res) {
+        if (!req.body || !req.headers['stripe-signature']) {
+            res.writeHead(400);
+            return res.end();
+        }
+        let event;
+        try {
+            event = this.webhookManager.parseSecondaryWebhook(req.body, req.headers['stripe-signature']);
+        } catch (err) {
+            logging.error(err);
+            res.writeHead(401);
+            return res.end();
+        }
+
+        logging.info(`Handling secondary webhook ${event.type}`);
+        try {
+            await this.handleEvent(event);
+            res.writeHead(200);
+            res.end();
+        } catch (err) {
+            logging.error(`Error handling secondary webhook ${event.type}`, err);
+            res.writeHead(err.statusCode || 500);
+            res.end();
+        }
+    }
+
+    /**
      * Accepts a webhook's event payload and delegates it to the appropriate handler based on the event type
      * @private
      * @param {import('stripe').Stripe.Event} event

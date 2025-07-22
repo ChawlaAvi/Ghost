@@ -172,4 +172,14 @@ module.exports = class WebhookManager {
     parseWebhook(body, signature) {
         return this.api.parseWebhook(body, signature, this.webhookSecret);
     }
+
+    /**
+     * Parse a webhook from the secondary Stripe account
+     * @param {string} body
+     * @param {string} signature
+     * @returns {import('stripe').Stripe.Event}
+     */
+    parseSecondaryWebhook(body, signature) {
+        return this.api.parseSecondaryWebhook(body, signature, this.config.secondaryWebhookSecret);
+    }
 };

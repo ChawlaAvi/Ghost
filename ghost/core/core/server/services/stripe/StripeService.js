@@ -1,5 +1,6 @@
 const WebhookManager = require('./WebhookManager');
 const StripeAPI = require('./StripeAPI');
+const DualStripeAPI = require('./DualStripeAPI');
 const StripeMigrations = require('./StripeMigrations');
 const WebhookController = require('./WebhookController');
 const DomainEvents = require('@tryghost/domain-events');
@@ -52,15 +53,15 @@ module.exports = class StripeService {
         StripeWebhook,
         models
     }) {
-        const api = new StripeAPI({labs});
+        const api = new DualStripeAPI({labs});
         const migrations = new StripeMigrations({
             models,
-            api
+            api: api.primaryAPI // Use primary API for migrations
         });
 
         const webhookManager = new WebhookManager({
             StripeWebhook,
-            api
+            api: api.primaryAPI // Use primary API for webhook management
         });
 
         const subscriptionEventService = new SubscriptionEventService({
@@ -149,27 +150,76 @@ module.exports = class StripeService {
 
     /**
      * Configures the Stripe API and registers the webhook with Stripe
-     * @param {IStripeServiceConfig} config
+     * @param {IStripeServiceConfig|object} config - Either legacy config or dual config with primary/secondary
      */
     async configure(config) {
-        this.api.configure({
-            secretKey: config.secretKey,
-            publicKey: config.publicKey,
-            enablePromoCodes: config.enablePromoCodes,
-            get enableAutomaticTax() {
-                return config.enableAutomaticTax;
-            },
-            checkoutSessionSuccessUrl: config.checkoutSessionSuccessUrl,
-            checkoutSessionCancelUrl: config.checkoutSessionCancelUrl,
-            checkoutSetupSessionSuccessUrl: config.checkoutSetupSessionSuccessUrl,
-            checkoutSetupSessionCancelUrl: config.checkoutSetupSessionCancelUrl,
-            testEnv: config.testEnv
-        });
+        // Handle dual configuration
+        if (config.primary || config.secondary) {
+            const primaryConfig = config.primary ? {
+                secretKey: config.primary.secretKey,
+                publicKey: config.primary.publicKey,
+                enablePromoCodes: config.primary.enablePromoCodes,
+                get enableAutomaticTax() {
+                    return config.primary.enableAutomaticTax;
+                },
+                checkoutSessionSuccessUrl: config.primary.checkoutSessionSuccessUrl,
+                checkoutSessionCancelUrl: config.primary.checkoutSessionCancelUrl,
+                checkoutSetupSessionSuccessUrl: config.primary.checkoutSetupSessionSuccessUrl,
+                checkoutSetupSessionCancelUrl: config.primary.checkoutSetupSessionCancelUrl,
+                testEnv: config.primary.testEnv
+            } : null;
 
-        await this.webhookManager.configure({
-            webhookSecret: config.webhookSecret,
-            webhookHandlerUrl: config.webhookHandlerUrl
-        });
+            const secondaryConfig = config.secondary ? {
+                secretKey: config.secondary.secretKey,
+                publicKey: config.secondary.publicKey,
+                enablePromoCodes: config.secondary.enablePromoCodes,
+                get enableAutomaticTax() {
+                    return config.secondary.enableAutomaticTax;
+                },
+                checkoutSessionSuccessUrl: config.secondary.checkoutSessionSuccessUrl,
+                checkoutSessionCancelUrl: config.secondary.checkoutSessionCancelUrl,
+                checkoutSetupSessionSuccessUrl: config.secondary.checkoutSetupSessionSuccessUrl,
+                checkoutSetupSessionCancelUrl: config.secondary.checkoutSetupSessionCancelUrl,
+                testEnv: config.secondary.testEnv
+            } : null;
+
+            this.api.configure({
+                primary: primaryConfig,
+                secondary: secondaryConfig
+            });
+
+            // Configure webhook manager with primary account
+            if (config.primary) {
+                await this.webhookManager.configure({
+                    webhookSecret: config.primary.webhookSecret,
+                    webhookHandlerUrl: config.primary.webhookHandlerUrl
+                });
+            }
+        } else {
+            // Legacy single account configuration
+            this.api.configure({
+                primary: {
+                    secretKey: config.secretKey,
+                    publicKey: config.publicKey,
+                    enablePromoCodes: config.enablePromoCodes,
+                    get enableAutomaticTax() {
+                        return config.enableAutomaticTax;
+                    },
+                    checkoutSessionSuccessUrl: config.checkoutSessionSuccessUrl,
+                    checkoutSessionCancelUrl: config.checkoutSessionCancelUrl,
+                    checkoutSetupSessionSuccessUrl: config.checkoutSetupSessionSuccessUrl,
+                    checkoutSetupSessionCancelUrl: config.checkoutSetupSessionCancelUrl,
+                    testEnv: config.testEnv
+                },
+                secondary: null
+            });
+
+            await this.webhookManager.configure({
+                webhookSecret: config.webhookSecret,
+                webhookHandlerUrl: config.webhookHandlerUrl
+            });
+        }
+
         await this.webhookManager.start();
     }
 };

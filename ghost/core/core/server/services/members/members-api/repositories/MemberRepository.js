@@ -928,7 +928,9 @@ module.exports = class MemberRepository {
             throw new errors.NotFoundError({message: tpl(messages.subscriptionNotFound)});
         }
 
-        const stripeSubscriptionData = await this._stripeAPIService.getSubscription(data.subscription.id);
+        const subscriptionResult = await this._stripeAPIService.getSubscription(data.subscription.id);
+        const stripeSubscriptionData = subscriptionResult.subscription || subscriptionResult;
+        const stripeAccount = subscriptionResult.account || 'primary';
         let paymentMethodId;
         if (!stripeSubscriptionData.default_payment_method) {
             paymentMethodId = null;
@@ -1024,7 +1026,8 @@ module.exports = class MemberRepository {
                 canceled: stripeSubscriptionData.cancel_at_period_end,
                 discount: stripeSubscriptionData.discount
             }),
-            offer_id: offerId
+            offer_id: offerId,
+            stripe_account: stripeAccount
         };
 
         const getStatus = (modelToCheck) => {

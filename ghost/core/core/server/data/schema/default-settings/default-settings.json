@@ -305,6 +305,42 @@
             "defaultValue": null,
             "type": "string"
         },
+        "stripe_secondary_secret_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_secondary_publishable_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_secondary_connect_publishable_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_secondary_connect_secret_key": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_secondary_connect_livemode": {
+            "defaultValue": null,
+            "type": "boolean"
+        },
+        "stripe_secondary_connect_display_name": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_secondary_connect_account_id": {
+            "defaultValue": null,
+            "type": "string"
+        },
+        "stripe_primary_account_name": {
+            "defaultValue": "Primary Account",
+            "type": "string"
+        },
+        "stripe_secondary_account_name": {
+            "defaultValue": "Secondary Account",
+            "type": "string"
+        },
         "members_monthly_price_id": {
             "defaultValue": null,
             "type": "string"

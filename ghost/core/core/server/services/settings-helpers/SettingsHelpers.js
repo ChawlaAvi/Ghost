@@ -33,15 +33,23 @@ class SettingsHelpers {
 
     /**
      * @param {'direct' | 'connect'} type - The "type" of keys to fetch from settings
+     * @param {'primary' | 'secondary'} account - The account to fetch keys for (defaults to primary)
      * @returns {{publicKey: string, secretKey: string} | null}
      */
-    getStripeKeys(type) {
+    getStripeKeys(type, account = 'primary') {
         if (type !== 'direct' && type !== 'connect') {
             throw new errors.IncorrectUsageError({message: tpl(messages.incorrectKeyType)});
         }
 
-        const secretKey = this.settingsCache.get(`stripe_${type === 'connect' ? 'connect_' : ''}secret_key`);
-        const publicKey = this.settingsCache.get(`stripe_${type === 'connect' ? 'connect_' : ''}publishable_key`);
+        if (account !== 'primary' && account !== 'secondary') {
+            throw new errors.IncorrectUsageError({message: 'Account must be either "primary" or "secondary"'});
+        }
+
+        const accountPrefix = account === 'secondary' ? 'secondary_' : '';
+        const typePrefix = type === 'connect' ? 'connect_' : '';
+        
+        const secretKey = this.settingsCache.get(`stripe_${accountPrefix}${typePrefix}secret_key`);
+        const publicKey = this.settingsCache.get(`stripe_${accountPrefix}${typePrefix}publishable_key`);
 
         if (!secretKey || !publicKey) {
             return null;
@@ -54,26 +62,89 @@ class SettingsHelpers {
     }
 
     /**
+     * Get primary Stripe account keys
      * @returns {{publicKey: string, secretKey: string} | null}
      */
-    getActiveStripeKeys() {
+    getPrimaryStripeKeys() {
         const stripeDirect = this.config.get('stripeDirect');
 
         if (stripeDirect) {
-            return this.getStripeKeys('direct');
+            return this.getStripeKeys('direct', 'primary');
         }
 
-        const connectKeys = this.getStripeKeys('connect');
+        const connectKeys = this.getStripeKeys('connect', 'primary');
 
         if (!connectKeys) {
-            return this.getStripeKeys('direct');
+            return this.getStripeKeys('direct', 'primary');
         }
 
         return connectKeys;
     }
 
+    /**
+     * Get secondary Stripe account keys
+     * @returns {{publicKey: string, secretKey: string} | null}
+     */
+    getSecondaryStripeKeys() {
+        const stripeDirect = this.config.get('stripeDirect');
+
+        if (stripeDirect) {
+            return this.getStripeKeys('direct', 'secondary');
+        }
+
+        const connectKeys = this.getStripeKeys('connect', 'secondary');
+
+        if (!connectKeys) {
+            return this.getStripeKeys('direct', 'secondary');
+        }
+
+        return connectKeys;
+    }
+
+    /**
+     * Get both primary and secondary Stripe account keys
+     * @returns {{primary: {publicKey: string, secretKey: string} | null, secondary: {publicKey: string, secretKey: string} | null}}
+     */
+    getDualStripeKeys() {
+        return {
+            primary: this.getPrimaryStripeKeys(),
+            secondary: this.getSecondaryStripeKeys()
+        };
+    }
+
+    /**
+     * Get account display names
+     * @returns {{primary: string, secondary: string}}
+     */
+    getStripeAccountNames() {
+        return {
+            primary: this.settingsCache.get('stripe_primary_account_name') || 'Primary Account',
+            secondary: this.settingsCache.get('stripe_secondary_account_name') || 'Secondary Account'
+        };
+    }
+
+    /**
+     * @returns {{publicKey: string, secretKey: string} | null}
+     * @deprecated Use getPrimaryStripeKeys() instead for clarity
+     */
+    getActiveStripeKeys() {
+        return this.getPrimaryStripeKeys();
+    }
+
     isStripeConnected() {
         return this.getActiveStripeKeys() !== null;
+    }
+
+    isPrimaryStripeConnected() {
+        return this.getPrimaryStripeKeys() !== null;
+    }
+
+    isSecondaryStripeConnected() {
+        return this.getSecondaryStripeKeys() !== null;
+    }
+
+    isDualStripeConnected() {
+        return this.isPrimaryStripeConnected() && this.isSecondaryStripeConnected();
     }
 
     arePaidMembersEnabled() {

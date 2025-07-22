@@ -42,34 +42,64 @@ module.exports = {
             };
         }
 
-        const keys = settingsHelpers.getActiveStripeKeys();
-        if (!keys) {
+        const dualKeys = settingsHelpers.getDualStripeKeys();
+        const primaryKeys = dualKeys.primary;
+        const secondaryKeys = dualKeys.secondary;
+        
+        // If no primary keys are configured, fall back to legacy behavior
+        if (!primaryKeys) {
             return null;
         }
 
         const env = config.get('env');
         let webhookSecret = process.env.WEBHOOK_SECRET;
+        let secondaryWebhookSecret = process.env.WEBHOOK_SECRET_SECONDARY;
 
         if (env !== 'production') {
             if (!webhookSecret) {
                 webhookSecret = 'DEFAULT_WEBHOOK_SECRET';
                 logging.warn(tpl(messages.remoteWebhooksInDevelopment));
             }
+            if (!secondaryWebhookSecret && secondaryKeys) {
+                secondaryWebhookSecret = 'DEFAULT_WEBHOOK_SECRET_SECONDARY';
+            }
         }
 
         const webhookHandlerUrl = new URL('members/webhooks/stripe/', urlUtils.getSiteUrl());
+        const secondaryWebhookHandlerUrl = new URL('members/webhooks/stripe/secondary/', urlUtils.getSiteUrl());
 
         const urls = getStripeUrlConfig();
+        const accountNames = settingsHelpers.getStripeAccountNames();
 
-        return {
-            ...keys,
+        const primaryConfig = {
+            ...primaryKeys,
             ...urls,
             enablePromoCodes: config.get('enableStripePromoCodes'),
             get enableAutomaticTax() {
                 return labs.isSet('stripeAutomaticTax');
             },
             webhookSecret: webhookSecret,
-            webhookHandlerUrl: webhookHandlerUrl.href
+            webhookHandlerUrl: webhookHandlerUrl.href,
+            accountName: accountNames.primary
+        };
+
+        const secondaryConfig = secondaryKeys ? {
+            ...secondaryKeys,
+            ...urls,
+            enablePromoCodes: config.get('enableStripePromoCodes'),
+            get enableAutomaticTax() {
+                return labs.isSet('stripeAutomaticTax');
+            },
+            webhookSecret: secondaryWebhookSecret,
+            webhookHandlerUrl: secondaryWebhookHandlerUrl.href,
+            accountName: accountNames.secondary
+        } : null;
+
+        return {
+            primary: primaryConfig,
+            secondary: secondaryConfig,
+            // Legacy support - return primary config at root level for backward compatibility
+            ...primaryConfig
         };
     }
 };

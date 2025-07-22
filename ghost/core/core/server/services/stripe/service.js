@@ -64,7 +64,20 @@ module.exports = new StripeService({
 });
 
 function stripeSettingsChanged(model) {
-    if (['stripe_publishable_key', 'stripe_secret_key', 'stripe_connect_publishable_key', 'stripe_connect_secret_key'].includes(model.get('key'))) {
+    const stripeSettingKeys = [
+        'stripe_publishable_key', 
+        'stripe_secret_key', 
+        'stripe_connect_publishable_key', 
+        'stripe_connect_secret_key',
+        'stripe_secondary_publishable_key',
+        'stripe_secondary_secret_key',
+        'stripe_secondary_connect_publishable_key',
+        'stripe_secondary_connect_secret_key',
+        'stripe_primary_account_name',
+        'stripe_secondary_account_name'
+    ];
+    
+    if (stripeSettingKeys.includes(model.get('key'))) {
         debouncedConfigureApi();
     }
 }

@@ -36,6 +36,7 @@ module.exports = function setupMembersApp() {
 
     // Webhooks
     membersApp.post('/webhooks/stripe', bodyParser.raw({type: 'application/json'}), stripeService.webhookController.handle.bind(stripeService.webhookController));
+    membersApp.post('/webhooks/stripe/secondary', bodyParser.raw({type: 'application/json'}), stripeService.webhookController.handleSecondary.bind(stripeService.webhookController));
 
     // Initializes members specific routes as well as assigns members specific data to the req/res objects
     // We don't want to add global bodyParser middleware as that interferes with stripe webhook requests on - `/webhooks`.
