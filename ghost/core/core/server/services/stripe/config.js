@@ -71,5 +71,44 @@ module.exports = {
             webhookSecret: webhookSecret,
             webhookHandlerUrl: webhookHandlerUrl.href
         };
+    },
+
+    getSecondaryConfig({config, urlUtils, settingsHelpers}) {
+        const keys = settingsHelpers.getActiveSecondaryStripeKeys();
+        if (!keys) {
+            return null;
+        }
+
+        const env = config.get('env');
+        let webhookSecret = process.env.SECONDARY_WEBHOOK_SECRET;
+
+        if (env !== 'production') {
+            if (!webhookSecret) {
+                webhookSecret = 'DEFAULT_SECONDARY_WEBHOOK_SECRET';
+                logging.warn(tpl(messages.remoteWebhooksInDevelopment));
+            }
+        }
+
+        const webhookHandlerUrl = new URL('members/webhooks/stripe-secondary/', urlUtils.getSiteUrl());
+
+        // Reuse the URL config from the primary account
+        const primaryConfig = this.getConfig({config, urlUtils, settingsHelpers});
+        if (!primaryConfig) {
+            return null;
+        }
+
+        return {
+            ...keys,
+            checkoutSessionSuccessUrl: primaryConfig.checkoutSessionSuccessUrl,
+            checkoutSessionCancelUrl: primaryConfig.checkoutSessionCancelUrl,
+            checkoutSetupSessionSuccessUrl: primaryConfig.checkoutSetupSessionSuccessUrl,
+            checkoutSetupSessionCancelUrl: primaryConfig.checkoutSetupSessionCancelUrl,
+            enablePromoCodes: config.get('enableStripePromoCodes'),
+            get enableAutomaticTax() {
+                return labs.isSet('stripeAutomaticTax');
+            },
+            webhookSecret: webhookSecret,
+            webhookHandlerUrl: webhookHandlerUrl.href
+        };
     }
 };

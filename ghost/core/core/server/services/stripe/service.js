@@ -7,7 +7,7 @@ const settings = require('../../../shared/settings-cache');
 const urlUtils = require('../../../shared/url-utils');
 const events = require('../../lib/common/events');
 const models = require('../../models');
-const {getConfig} = require('./config');
+const {getConfig, getSecondaryConfig} = require('./config');
 const settingsHelpers = require('../settings-helpers');
 const donationService = require('../donations');
 const staffService = require('../staff');
@@ -15,10 +15,18 @@ const labs = require('../../../shared/labs');
 
 async function configureApi() {
     const cfg = getConfig({settingsHelpers, config, urlUtils});
+    const secondaryCfg = getSecondaryConfig({settingsHelpers, config, urlUtils});
+    
     if (cfg) {
         // @NOTE: to not start test mode when running playwright suite
         cfg.testEnv = process.env.NODE_ENV.startsWith('test') && process.env.NODE_ENV !== 'testing-browser';
         await module.exports.configure(cfg);
+        
+        if (secondaryCfg) {
+            secondaryCfg.testEnv = cfg.testEnv;
+            await module.exports.configureSecondary(secondaryCfg);
+        }
+        
         return true;
     }
     return false;
@@ -64,7 +72,21 @@ module.exports = new StripeService({
 });
 
 function stripeSettingsChanged(model) {
-    if (['stripe_publishable_key', 'stripe_secret_key', 'stripe_connect_publishable_key', 'stripe_connect_secret_key'].includes(model.get('key'))) {
+    const primaryKeys = [
+        'stripe_publishable_key', 
+        'stripe_secret_key', 
+        'stripe_connect_publishable_key', 
+        'stripe_connect_secret_key'
+    ];
+    
+    const secondaryKeys = [
+        'stripe_secondary_publishable_key', 
+        'stripe_secondary_secret_key', 
+        'stripe_secondary_connect_publishable_key', 
+        'stripe_secondary_connect_secret_key'
+    ];
+    
+    if ([...primaryKeys, ...secondaryKeys].includes(model.get('key'))) {
         debouncedConfigureApi();
     }
 }

@@ -1,0 +1,56 @@
+{{!< ../layouts/default}}
+
+<section class="gh-canvas">
+    <header class="gh-canvas-header">
+        <h2 class="gh-canvas-title">Stripe Accounts</h2>
+    </header>
+
+    <section class="view-container">
+        <div class="gh-main-section">
+            <div class="gh-main-section-block">
+                <h3 class="gh-main-section-header small bn">Primary Stripe Account</h3>
+                <div class="gh-expandable-block">
+                    <div class="gh-expandable-header">
+                        <div>
+                            <h4 class="gh-expandable-title">{{if settings.stripe_connect_display_name settings.stripe_connect_display_name "Not connected"}}</h4>
+                            <p class="gh-expandable-description">
+                                {{if settings.stripe_connect_livemode "Live Mode" "Test Mode"}}
+                            </p>
+                        </div>
+                        <div class="gh-expandable-header-action">
+                            {{#if settings.stripe_connect_account_id}}
+                                <span class="gh-badge gh-badge-green">Connected</span>
+                            {{else}}
+                                <span class="gh-badge">Not connected</span>
+                            {{/if}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="gh-main-section">
+            <div class="gh-main-section-block">
+                <h3 class="gh-main-section-header small bn">Secondary Stripe Account</h3>
+                <div class="gh-expandable-block">
+                    <div class="gh-expandable-header">
+                        <div>
+                            <h4 class="gh-expandable-title">{{if settings.stripe_secondary_connect_display_name settings.stripe_secondary_connect_display_name "Not connected"}}</h4>
+                            <p class="gh-expandable-description">
+                                {{if settings.stripe_secondary_connect_livemode "Live Mode" "Test Mode"}}
+                            </p>
+                        </div>
+                        <div class="gh-expandable-header-action">
+                            {{#if settings.stripe_secondary_connect_account_id}}
+                                <span class="gh-badge gh-badge-green">Connected</span>
+                            {{else}}
+                                <span class="gh-badge">Not connected</span>
+                            {{/if}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</section>
+
