@@ -1,5 +1,6 @@
 const WebhookManager = require('./WebhookManager');
 const StripeAPI = require('./StripeAPI');
+const StripeAccountManager = require('./StripeAccountManager');
 const StripeMigrations = require('./StripeMigrations');
 const WebhookController = require('./WebhookController');
 const DomainEvents = require('@tryghost/domain-events');
@@ -34,6 +35,7 @@ module.exports = class StripeService {
      * @param {*} deps.membersService
      * @param {*} deps.donationService
      * @param {*} deps.staffService
+     * @param {*} deps.settingsHelpers
      * @param {import('./WebhookManager').StripeWebhook} deps.StripeWebhook
      * @param {object} deps.models
      * @param {object} deps.models.Product
@@ -49,10 +51,19 @@ module.exports = class StripeService {
         membersService,
         donationService,
         staffService,
+        settingsHelpers,
         StripeWebhook,
         models
     }) {
+        // Legacy single API for backward compatibility
         const api = new StripeAPI({labs});
+        
+        // New account manager for dual accounts
+        const accountManager = new StripeAccountManager({
+            settingsHelpers,
+            labs
+        });
+        
         const migrations = new StripeMigrations({
             models,
             api
@@ -120,6 +131,7 @@ module.exports = class StripeService {
 
         this.models = models;
         this.api = api;
+        this.accountManager = accountManager;
         this.webhookManager = webhookManager;
         this.migrations = migrations;
         this.webhookController = webhookController;
@@ -152,9 +164,23 @@ module.exports = class StripeService {
      * @param {IStripeServiceConfig} config
      */
     async configure(config) {
+        // Configure legacy API for backward compatibility
         this.api.configure({
             secretKey: config.secretKey,
             publicKey: config.publicKey,
+            enablePromoCodes: config.enablePromoCodes,
+            get enableAutomaticTax() {
+                return config.enableAutomaticTax;
+            },
+            checkoutSessionSuccessUrl: config.checkoutSessionSuccessUrl,
+            checkoutSessionCancelUrl: config.checkoutSessionCancelUrl,
+            checkoutSetupSessionSuccessUrl: config.checkoutSetupSessionSuccessUrl,
+            checkoutSetupSessionCancelUrl: config.checkoutSetupSessionCancelUrl,
+            testEnv: config.testEnv
+        });
+
+        // Configure account manager for dual accounts
+        await this.accountManager.configure({
             enablePromoCodes: config.enablePromoCodes,
             get enableAutomaticTax() {
                 return config.enableAutomaticTax;

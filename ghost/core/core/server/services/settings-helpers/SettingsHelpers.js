@@ -54,9 +54,134 @@ class SettingsHelpers {
     }
 
     /**
+     * @param {'primary' | 'secondary'} account - The account to fetch keys for
+     * @param {'direct' | 'connect'} type - The "type" of keys to fetch from settings
+     * @returns {{publicKey: string, secretKey: string, accountId?: string, displayName?: string, livemode?: boolean} | null}
+     */
+    getDualStripeKeys(account, type) {
+        if (account !== 'primary' && account !== 'secondary') {
+            throw new errors.IncorrectUsageError({message: 'account must be one of "primary" or "secondary".'});
+        }
+        if (type !== 'direct' && type !== 'connect') {
+            throw new errors.IncorrectUsageError({message: tpl(messages.incorrectKeyType)});
+        }
+
+        const prefix = `stripe_${account}_${type === 'connect' ? 'connect_' : ''}`;
+        const secretKey = this.settingsCache.get(`${prefix}secret_key`);
+        const publicKey = this.settingsCache.get(`${prefix}publishable_key`);
+
+        if (!secretKey || !publicKey) {
+            return null;
+        }
+
+        const result = {
+            secretKey,
+            publicKey
+        };
+
+        // Add additional connect-specific fields if available
+        if (type === 'connect') {
+            const accountId = this.settingsCache.get(`${prefix}account_id`);
+            const displayName = this.settingsCache.get(`${prefix}display_name`);
+            const livemode = this.settingsCache.get(`${prefix}livemode`);
+            
+            if (accountId) result.accountId = accountId;
+            if (displayName) result.displayName = displayName;
+            if (livemode !== null) result.livemode = livemode;
+        }
+
+        return result;
+    }
+
+    /**
+     * @param {'primary' | 'secondary'} account - The account to fetch keys for
+     * @returns {{publicKey: string, secretKey: string, accountId?: string, displayName?: string, livemode?: boolean} | null}
+     */
+    getStripeKeysForAccount(account) {
+        const stripeDirect = this.config.get('stripeDirect');
+
+        if (stripeDirect) {
+            return this.getDualStripeKeys(account, 'direct');
+        }
+
+        const connectKeys = this.getDualStripeKeys(account, 'connect');
+
+        if (!connectKeys) {
+            return this.getDualStripeKeys(account, 'direct');
+        }
+
+        return connectKeys;
+    }
+
+    /**
+     * @returns {{publicKey: string, secretKey: string, accountId?: string, displayName?: string, livemode?: boolean} | null}
+     */
+    getPrimaryStripeKeys() {
+        return this.getStripeKeysForAccount('primary');
+    }
+
+    /**
+     * @returns {{publicKey: string, secretKey: string, accountId?: string, displayName?: string, livemode?: boolean} | null}
+     */
+    getSecondaryStripeKeys() {
+        return this.getStripeKeysForAccount('secondary');
+    }
+
+    /**
+     * @returns {Array<{account: string, keys: {publicKey: string, secretKey: string, accountId?: string, displayName?: string, livemode?: boolean}}>}
+     */
+    getAllStripeAccounts() {
+        const accounts = [];
+        
+        const primaryKeys = this.getPrimaryStripeKeys();
+        if (primaryKeys) {
+            accounts.push({
+                account: 'primary',
+                keys: primaryKeys
+            });
+        }
+
+        const secondaryKeys = this.getSecondaryStripeKeys();
+        if (secondaryKeys) {
+            accounts.push({
+                account: 'secondary',
+                keys: secondaryKeys
+            });
+        }
+
+        return accounts;
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    isDualStripeAccountsEnabled() {
+        return this.settingsCache.get('stripe_dual_accounts_enabled') === true;
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    hasDualStripeAccounts() {
+        return this.getPrimaryStripeKeys() !== null && this.getSecondaryStripeKeys() !== null;
+    }
+
+    /**
      * @returns {{publicKey: string, secretKey: string} | null}
      */
     getActiveStripeKeys() {
+        // If dual accounts are enabled, return primary account keys
+        if (this.isDualStripeAccountsEnabled()) {
+            const primaryKeys = this.getPrimaryStripeKeys();
+            if (primaryKeys) {
+                return {
+                    publicKey: primaryKeys.publicKey,
+                    secretKey: primaryKeys.secretKey
+                };
+            }
+        }
+
+        // Fallback to legacy single-account logic for backward compatibility
         const stripeDirect = this.config.get('stripeDirect');
 
         if (stripeDirect) {
