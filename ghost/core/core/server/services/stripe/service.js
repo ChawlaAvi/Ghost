@@ -33,6 +33,7 @@ const debouncedConfigureApi = _.debounce(() => {
 module.exports = new StripeService({
     labs,
     membersService,
+    settingsHelpers,
     models: _.pick(models, [
         'Product',
         'StripePrice',
